@@ -96,6 +96,8 @@ void binc_device_set_bonding_state_changed_cb(Device *device, BondingStateChange
 
 gboolean binc_device_has_service(const Device *device, const char *service_uuid);
 
+GDBusConnection *binc_device_get_dbus_connection(const Device *device);
+
 GList *binc_device_get_services(const Device *device);
 
 Service *binc_device_get_service(const Device *device, const char *service_uuid);
@@ -136,6 +138,8 @@ BondingState binc_device_get_bonding_state(const Device *device);
 Adapter *binc_device_get_adapter(const Device *device);
 
 guint binc_device_get_mtu(const Device *device);
+
+void binc_device_set_is_central(Device *device, gboolean is_central);
 
 gboolean binc_device_is_central(const Device *device);
 

@@ -648,6 +648,9 @@ void binc_device_connect(Device *device) {
     // Don't do anything if we are not disconnected
     if (device->connection_state != BINC_DISCONNECTED) return;
 
+	// Since we are initiating connection, device must be peripheral
+	device->is_central = FALSE;
+
     log_debug(TAG, "Connecting to '%s' (%s) (%s)", device->name, device->address,
               device->paired ? "BINC_BONDED" : "BINC_BOND_NONE");
 
