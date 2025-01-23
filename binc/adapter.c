@@ -396,10 +396,12 @@ static void binc_internal_device_appeared(__attribute__((unused)) GDBusConnectio
 			}
 
 			// Trying to detect iPad with private random resolvable address ...not working since it does not trigger this function
+#if 0
             if (!g_strcmp0(binc_device_get_name(device), "iPad")) {
 				binc_device_set_is_central (device, TRUE);
 				gl_log (GL_LOG_TRACE, "[%s] Hardcode iPad central '%s':[%s] %d\n", __func__, binc_device_get_name(device), binc_device_get_address(device), binc_device_get_connection_state(device));
 			}
+#endif
         }
     }
 
@@ -608,13 +610,14 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
 				gl_log (GL_LOG_TRACE, "[%s]: discovering and remote device disconnected [%s]:'%16.16s' -> peripheral\n", __func__, binc_device_get_address (device), binc_device_get_name (device));
 			}
 #endif
-
+#if 0
         //if ((!g_strcmp0(binc_device_get_address(device), "E0:48:24:50:BB:EF") || !g_strcmp0(binc_device_get_name(device), "iPad")) &&
         if ((!g_strcmp0(binc_device_get_name(device), "iPad")) &&
                (binc_device_get_bonding_state(device) == BINC_BONDED)) {
 			//log_error(TAG,"[%s] central, connection '%s':[%s] %d", __func__, binc_device_get_name(device), binc_device_get_address(device), binc_device_get_connection_state(device));
             binc_device_set_is_central(device, TRUE);
         }
+#endif
 
 //        if (binc_device_is_central(device)) {
 //            ConnectionState newState = binc_device_get_connection_state(device);
