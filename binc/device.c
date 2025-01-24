@@ -63,6 +63,12 @@ static const char *connection_state_names[] = {
         [BINC_DISCONNECTING]  = "DISCONNECTING"
 };
 
+static const char *role_names[] = {
+        [BINC_ROLE_UNDEFINED] = "Undefined",
+        [BINC_ROLE_PERIPHERAL] = "Peripheral",
+        [BINC_ROLE_CENTRAL]  = "Central",
+};
+
 struct binc_device {
     GDBusConnection *connection; // Borrowed
     Adapter *adapter; // Borrowed
@@ -92,7 +98,7 @@ struct binc_device {
     GList *services_list; // Owned
     GHashTable *characteristics; // Owned
     GHashTable *descriptors; // Owned
-    gboolean is_central;
+    RoleState role; // persistent throughout connection
 
     OnReadCallback on_read_callback;
     OnWriteCallback on_write_callback;
@@ -120,6 +126,7 @@ Device *binc_device_create(const char *path, Adapter *adapter) {
     device->txpower = -255;
     device->mtu = 23;
     device->user_data = NULL;
+    device->role = BINC_ROLE_UNDEFINED;
     return device;
 }
 
@@ -649,7 +656,8 @@ void binc_device_connect(Device *device) {
     if (device->connection_state != BINC_DISCONNECTED) return;
 
 	// Since we are initiating connection, device must be peripheral
-	device->is_central = FALSE;
+	binc_device_set_role (device, BINC_ROLE_PERIPHERAL);
+	//device->is_central = FALSE;
 
     log_debug(TAG, "Connecting to '%s' (%s) (%s)", device->name, device->address,
               device->paired ? "BINC_BONDED" : "BINC_BOND_NONE");
@@ -1098,14 +1106,32 @@ void binc_device_set_service_data(Device *device, GHashTable *service_data) {
     device->service_data = service_data;
 }
 
-void binc_device_set_is_central(Device *device, gboolean is_central) {
+void binc_device_set_role(Device *device, RoleState role) {
     g_assert(device != NULL);
-    device->is_central = is_central;
+
+    if (role == BINC_ROLE_UNDEFINED) {
+		device->role = role;
+	}
+	else {
+		if (device->role == BINC_ROLE_UNDEFINED) {
+			device->role = role;
+		}
+		else {
+			log_error(TAG, "[%s] Error: trying to change role from %d to %d\n", __func__);
+			g_assert (0); // Can't change role until reset
+		}
+	}
 }
 
-gboolean binc_device_is_central(const Device *device) {
+RoleState binc_device_get_role(const Device *device) {
     g_assert(device != NULL);
-    return device->is_central;
+
+    return device->role;
+}
+
+const char *binc_device_get_role_name(const Device *device) {
+    g_assert(device != NULL);
+    return role_names[device->role];
 }
 
 GDBusConnection *binc_device_get_dbus_connection(const Device *device) {

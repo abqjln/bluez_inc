@@ -21,6 +21,8 @@
  *
  */
 
+#include <assert.h>
+
 #include "adapter.h"
 #include "device.h"
 #include "device_internal.h"
@@ -369,9 +371,10 @@ static void binc_internal_device_appeared(__attribute__((unused)) GDBusConnectio
 			if (binc_device_get_connection_state(device) == BINC_CONNECTED) {
 				// Any new remote device that is already connected must be a central, regardless
 				// of discovery state because our local central could not have connected to an non-hashed device
-				binc_device_set_is_central (device, TRUE); // Central
+				//binc_device_set_is_central (device, TRUE); // Central
+				binc_device_set_role (device, BINC_ROLE_CENTRAL);
 				gl_log (GL_LOG_TRACE, "[%s]: remote device appeared connected [%s]:'%s'-> central=%d\n",
-						__func__, binc_device_get_address (device), binc_device_get_name (device), binc_device_is_central (device));
+						__func__, binc_device_get_address (device), binc_device_get_name (device), binc_device_get_role (device));
 				// New device appearing and connected triggers callback
 				if (adapter->centralStateCallback != NULL) {
 						adapter->centralStateCallback(adapter, device);
@@ -380,10 +383,13 @@ static void binc_internal_device_appeared(__attribute__((unused)) GDBusConnectio
 			else if (binc_device_get_connection_state(device) == BINC_DISCONNECTED) {
 				if (adapter->discovery_state == BINC_DISCOVERY_STARTED) {
 					// local adapter scanning found their advertisement prior_to_connecting
-					binc_device_set_is_central (device, FALSE); // Peripheral
-					deliver_discovery_result (adapter, device);
-					//if (g_str_equal(binc_device_get_address(device),"E0:48:24:50:BB:EF")) gl_log (GL_LOG_TRACE, "[%s]: remote device appeared disconnected [%s]:'%s' -> central=%d\n",
-					//		__func__, binc_device_get_address (device), binc_device_get_name (device), binc_device_is_central (device));
+
+					// Role not yet determined
+					//binc_device_set_is_central (device, FALSE); // Peripheral
+					//binc_device_set_role (device, BINC_ROLE_PERIPHERAL);
+				//gl_log (GL_LOG_TRACE, "[%s]: remote device appeared disconnected [%s]:'%s'-> central=%d\n",
+				//		__func__, binc_device_get_address (device), binc_device_get_name (device), binc_device_get_role (device));
+				//	deliver_discovery_result (adapter, device);
 					// No callback for disconnected device
 				}
 				else {
@@ -391,17 +397,9 @@ static void binc_internal_device_appeared(__attribute__((unused)) GDBusConnectio
 					// Set as peripheral and continue
 					gl_log (GL_LOG_ERROR, "[%s]: not discovering and remote device is disconnected [%s]:'%s' -> should not happen?\n",
 							__func__, binc_device_get_address (device), binc_device_get_name (device));
-					binc_device_set_is_central (device, FALSE);
+					assert (0);
 				}
 			}
-
-			// Trying to detect iPad with private random resolvable address ...not working since it does not trigger this function
-#if 0
-            if (!g_strcmp0(binc_device_get_name(device), "iPad")) {
-				binc_device_set_is_central (device, TRUE);
-				gl_log (GL_LOG_TRACE, "[%s] Hardcode iPad central '%s':[%s] %d\n", __func__, binc_device_get_name(device), binc_device_get_address(device), binc_device_get_connection_state(device));
-			}
-#endif
         }
     }
 
@@ -504,63 +502,66 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
             }
         }
 
-		// Process state changes
+		// Process state changes; role persists throughout connection
         ConnectionState newState = binc_device_get_connection_state(device);
+        RoleState oldRole = binc_device_get_role (device);
 		//GError *error;
 //		gl_log (GL_LOG_TRACE, "[%s]: Processing [%s]:'%16.16s' new=%d, old=%d, disresult=%d, discovering=%d, central=%d\n",
 //				__func__, binc_device_get_address (device), binc_device_get_name (device),
 //				newState, oldState, isDiscoveryResult, adapter->discovering, binc_device_is_central(device));
 
 		if (((newState == BINC_CONNECTED)) && (newState != oldState)) {
-			gl_log (GL_LOG_TRACE, "[%s]: Change to connected [%s]:'%s' new=%d, old=%d, isDiscoveryResult=%d, adapter->discovering=%d, central=%d\n",
-					__func__, binc_device_get_address (device), binc_device_get_name (device),
-					newState, oldState, isDiscoveryResult, adapter->discovering, binc_device_is_central(device));
-			if (adapter->discovering == BINC_DISCOVERY_STOPPED) {
-				// Change to connected, not discovering: remote central device
-				binc_device_set_is_central (device, TRUE);
-				gl_log (GL_LOG_TRACE, "[%s]: DISCOVERY_STOPPED -> central=%d\n", __func__, binc_device_is_central (device));
+			if (binc_device_get_role (device) == BINC_ROLE_PERIPHERAL) {
+				// Was set to BINC_ROLE_PERIPHERAL in binc_device_connect
+//				if (device->connection_state_callback != NULL) {
+//					device->connection_state_callback (adapter, device, error);
+//				}
+			}
+			else if (binc_device_get_role (device) == BINC_ROLE_CENTRAL) {
+				// Could have been set when device_appeared
+				binc_device_set_role (device, BINC_ROLE_CENTRAL);
 				if (adapter->centralStateCallback != NULL) {
 					adapter->centralStateCallback (adapter, device);
 				}
 			}
-			else if (adapter->discovering == BINC_DISCOVERY_STARTED) {
-				if (isDiscoveryResult) {
-					// Change to connected, discovering, isDiscoveryResult: peripheral
-					binc_device_set_is_central (device, FALSE);
-					gl_log (GL_LOG_TRACE, "[%s]: DISCOVERY_STARTED, isDiscoveryResult=%d -> central=%d\n", __func__, isDiscoveryResult, binc_device_is_central (device));
-					//binc_device_run_connection_state_cb(device, newState, error);
-				}
-				else {
-					// Change to connected, discovering, not a discovery result: central
-					binc_device_set_is_central (device, TRUE);
-					gl_log (GL_LOG_TRACE, "[%s]: DISCOVERY_STARTED, isDiscoveryResult=%d -> central=%d\n", __func__, isDiscoveryResult, binc_device_is_central (device));
-					if (adapter->centralStateCallback != NULL) {
-						adapter->centralStateCallback (adapter, device);
-					}
-				}
-			}
-		}
-		else if ((newState == BINC_DISCONNECTED) && (newState != oldState)) {
-			gl_log (GL_LOG_TRACE, "[%s]: Change to disconnected [%s]:'%s' new=%d, old=%d, isDiscoveryResult=%d, adapter->discovering=%d, central=%d\n",
-					__func__, binc_device_get_address (device), binc_device_get_name (device),
-					newState, oldState, isDiscoveryResult, adapter->discovering, binc_device_is_central(device));
-			if (binc_device_is_central(device)) {
-				// Central change to disconnected:
-				gl_log (GL_LOG_TRACE, "[%s]: Central change to disconnected central=%d\n", __func__, binc_device_is_central (device));
+			else if (binc_device_get_role (device) == BINC_ROLE_UNDEFINED) {
+				// Not previously set; must be a central
+				binc_device_set_role (device, BINC_ROLE_CENTRAL);
 				if (adapter->centralStateCallback != NULL) {
 					adapter->centralStateCallback (adapter, device);
 				}
-				binc_device_set_is_central (device, FALSE); // reset since no connecton
-				gl_log (GL_LOG_TRACE, "[%s]: reset central=%d\n", __func__, binc_device_is_central (device));
 			}
-			else {
-				// Peripheral change to disconnected:
-				gl_log (GL_LOG_TRACE, "[%s]: Peripheral change to disconnected central=%d\n", __func__, binc_device_is_central (device));
-				//binc_device_run_connection_state_cb(device, newState, error);
-				binc_device_set_is_central (device, FALSE); // reset since no connection
-				gl_log (GL_LOG_TRACE, "[%s]: reset central=%d\n", __func__, binc_device_is_central (device));
-			}
+
+			gl_log (GL_LOG_TRACE, "[%s]: Device [%s]:'%s' state changed to %s (%d, old=%d), Role %s (%d, old=%d), isDiscoveryResult=%d\n",
+					__func__, binc_device_get_address (device), binc_device_get_name (device),
+					binc_device_get_connection_state_name (device), newState, oldState,
+					binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
 		}
+		else if (((newState == BINC_DISCONNECTED)) && (newState != oldState)) {
+			if (binc_device_get_role (device) == BINC_ROLE_PERIPHERAL) {
+				binc_device_set_role (device, BINC_ROLE_UNDEFINED);
+//				if (device->connection_state_callback != NULL) {
+//					device->connection_state_callback (adapter, device, error);
+//				}
+			}
+			else if (binc_device_get_role (device) == BINC_ROLE_CENTRAL) {
+				// Could have been set when device_appeared
+				binc_device_set_role (device, BINC_ROLE_UNDEFINED);
+				if (adapter->centralStateCallback != NULL) {
+					adapter->centralStateCallback (adapter, device);
+				}
+			}
+			else if (binc_device_get_role (device) == BINC_ROLE_UNDEFINED) {
+				// How did we get here?
+				assert (1);
+			}
+
+			gl_log (GL_LOG_TRACE, "[%s]: Device [%s]:'%s' state changed to %s (%d, old=%d), Role %s (%d, old=%d), isDiscoveryResult=%d\n",
+					__func__, binc_device_get_address (device), binc_device_get_name (device),
+					binc_device_get_connection_state_name (device), newState, oldState,
+					binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
+		}
+
 		else {
 			if (isDiscoveryResult && (adapter->discovery_state == BINC_DISCOVERY_STARTED)) {
 				// No connection state change, discovering
@@ -570,55 +571,6 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
 				}
 			}
 		}
-
-#if 0
-		// Connection state change callbacks
-		if (old_state != new_state) {
-			if (binc_device_is_central(device)) {
-				if (adapter->centralStateCallback != NULL) {
-					adapter->centralStateCallback (adapter, device);
-				}
-			} else {
-//					if (device->connection_state_callback != NULL) {
-//						device->connection_state_callback (adapter, device, error);
-//					}
-					//gl_on_adapter_lcentral_changed_rperiph_connection_state (adapter, device, error);
-			}
-		}
-#endif
-
-
-
-//        ConnectionState newState = binc_device_get_connection_state(device);
-
-#if 0
-			// Device is new to cache
-			if (adapter->discovery_state == BINC_DISCOVERY_STOPPED && binc_device_get_connection_state(device) == BINC_CONNECTED) {
-                binc_device_set_is_central (device, TRUE);
-				gl_log (GL_LOG_TRACE, "[%s]: not discovering and remote device initiated connection [%s]:'%16.16s'  -> central\n", __func__, binc_device_get_address (device), binc_device_get_name (device));
-			}
-			if (adapter->discovery_state == BINC_DISCOVERY_STOPPED && binc_device_get_connection_state(device) == BINC_DISCONNECTED) {
-				gl_log (GL_LOG_TRACE, "[%s]: not discovering and remote device disconnected [%s]:'%16.16s' -> should not happen?\n", __func__, binc_device_get_address (device), binc_device_get_name (device));
-                binc_device_set_is_central (device, FALSE);
-			}
-			if (adapter->discovery_state == BINC_DISCOVERY_STARTED && binc_device_get_connection_state(device) == BINC_CONNECTED) {
-                binc_device_set_is_central (device, TRUE);
-				gl_log (GL_LOG_TRACE, "[%s]: discovering and remote device initiated connection [%s]:'%16.16s'-> central\n", __func__, binc_device_get_address (device), binc_device_get_name (device));
-			}
-			if (adapter->discovery_state == BINC_DISCOVERY_STARTED && binc_device_get_connection_state(device) == BINC_DISCONNECTED) {
-				binc_device_set_is_central (device, FALSE);
-				deliver_discovery_result (adapter, device);
-				gl_log (GL_LOG_TRACE, "[%s]: discovering and remote device disconnected [%s]:'%16.16s' -> peripheral\n", __func__, binc_device_get_address (device), binc_device_get_name (device));
-			}
-#endif
-#if 0
-        //if ((!g_strcmp0(binc_device_get_address(device), "E0:48:24:50:BB:EF") || !g_strcmp0(binc_device_get_name(device), "iPad")) &&
-        if ((!g_strcmp0(binc_device_get_name(device), "iPad")) &&
-               (binc_device_get_bonding_state(device) == BINC_BONDED)) {
-			//log_error(TAG,"[%s] central, connection '%s':[%s] %d", __func__, binc_device_get_name(device), binc_device_get_address(device), binc_device_get_connection_state(device));
-            binc_device_set_is_central(device, TRUE);
-        }
-#endif
 
 //        if (binc_device_is_central(device)) {
 //            ConnectionState newState = binc_device_get_connection_state(device);

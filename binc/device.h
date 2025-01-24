@@ -40,6 +40,10 @@ typedef enum BondingState {
     BINC_BOND_NONE = 0, BINC_BONDING = 1, BINC_BONDED = 2
 } BondingState;
 
+typedef enum RoleState {
+	BINC_ROLE_UNDEFINED = 0, BINC_ROLE_PERIPHERAL = 1, BINC_ROLE_CENTRAL = 2
+} RoleState;
+
 typedef void (*ConnectionStateChangedCallback)(Device *device, ConnectionState state, const GError *error);
 
 typedef void (*ServicesResolvedCallback)(Device *device);
@@ -139,9 +143,15 @@ Adapter *binc_device_get_adapter(const Device *device);
 
 guint binc_device_get_mtu(const Device *device);
 
-void binc_device_set_is_central(Device *device, gboolean is_central);
+//void binc_device_set_is_central(Device *device, gboolean is_central);
 
-gboolean binc_device_is_central(const Device *device);
+//gboolean binc_device_is_central(const Device *device);
+
+void binc_device_set_role(Device *device, RoleState role);
+
+RoleState binc_device_get_role(const Device *device);
+
+const char *binc_device_get_role_name(const Device *device);
 
 char *binc_device_to_string(const Device *device);
 
