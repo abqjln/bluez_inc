@@ -564,9 +564,10 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
 		else {
 			if (isDiscoveryResult && (adapter->discovery_state == BINC_DISCOVERY_STARTED)) {
 				// No connection state change, discovering
-				// A multi-role central device will also appear here due to peripheral role
-				//if (g_str_equal(binc_device_get_address(device),"E0:48:24:50:BB:EF")) gl_log (GL_LOG_TRACE, "[%s]: No connection change [%s]:'%s' \n", __func__, binc_device_get_address (device), binc_device_get_name (device));
-				deliver_discovery_result(adapter, device);
+				if (isDiscoveryResult) {
+					// Could be a desired peripheral
+					deliver_discovery_result(adapter, device);
+				}
 			}
 		}
 
