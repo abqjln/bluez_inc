@@ -657,7 +657,6 @@ void binc_device_connect(Device *device) {
 
 	// Since we are initiating connection, device must be peripheral
 	binc_device_set_role (device, BINC_ROLE_PERIPHERAL);
-	//device->is_central = FALSE;
 
     log_debug(TAG, "Connecting to '%s' (%s) (%s)", device->name, device->address,
               device->paired ? "BINC_BONDED" : "BINC_BOND_NONE");
