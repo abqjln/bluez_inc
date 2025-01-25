@@ -36,7 +36,6 @@ struct binc_agent {
     char *path; // Owned
     IoCapability io_capability;
     GDBusConnection *connection; // Borrowed
-    Adapter *adapter; // Borrowed
     guint registration_id;
     AgentRequestAuthorizationCallback request_authorization_callback;
     AgentRequestPasskeyCallback request_passkey_callback;
@@ -53,7 +52,6 @@ void binc_agent_free(Agent *agent) {
     agent->path = NULL;
 
     agent->connection = NULL;
-    agent->adapter = NULL;
 
     g_free(agent);
 }
@@ -75,9 +73,6 @@ static void bluez_agent_method_call(GDBusConnection *conn,
     Agent *agent = (Agent *) userdata;
     g_assert(agent != NULL);
 
-    Adapter *adapter = agent->adapter;
-    g_assert(adapter != NULL);
-
     if (g_str_equal(method, "RequestPinCode")) {
         g_variant_get(params, "(o)", &object_path);
         log_debug(TAG, "request pincode for %s", object_path);
@@ -94,7 +89,7 @@ static void bluez_agent_method_call(GDBusConnection *conn,
         g_dbus_method_invocation_return_value(invocation, NULL);
     } else if (g_str_equal(method, "RequestPasskey")) {
         g_variant_get(params, "(o)", &object_path);
-        Device *device = binc_adapter_get_device_by_path(adapter, object_path);
+        Device *device = binc_agent_get_device_by_path(conn, object_path);
         g_free(object_path);
 
         if (device != NULL) {
@@ -120,7 +115,7 @@ static void bluez_agent_method_call(GDBusConnection *conn,
     } else if (g_str_equal(method, "RequestAuthorization")) {
         g_variant_get(params, "(o)", &object_path);
         log_debug(TAG, "request for authorization %s", object_path);
-        Device *device = binc_adapter_get_device_by_path(adapter, object_path);
+        Device *device = binc_agent_get_device_by_path(conn, object_path);
         g_free(object_path);
         if (device != NULL) {
             binc_device_set_bonding_state(device, BINC_BONDING);
@@ -276,11 +271,10 @@ int binc_agentmanager_register_agent(Agent *agent) {
     return result;
 }
 
-Agent *binc_agent_create(Adapter *adapter, const char *path, IoCapability io_capability) {
+Agent *binc_agent_create(GDBusConnection *dbconnection, const char *path, IoCapability io_capability) {
     Agent *agent = g_new0(Agent, 1);
     agent->path = g_strdup(path);
-    agent->connection = binc_adapter_get_dbus_connection(adapter);
-    agent->adapter = adapter;
+    agent->connection = dbconnection;
     agent->io_capability = io_capability;
     bluez_register_agent(agent);
     binc_agentmanager_register_agent(agent);
@@ -304,9 +298,19 @@ const char *binc_agent_get_path(const Agent *agent) {
     return agent->path;
 }
 
-Adapter *binc_agent_get_adapter(const Agent *agent){
-	g_assert(agent != NULL);
-	return agent->adapter;
-}
+Device *binc_agent_get_device_by_path(GDBusConnection *dbconnection, const char *device_path) {
+    log_debug (TAG, "[%s]\n", __func__);
+    GPtrArray *array = binc_adapter_find_all( dbconnection );
+    for (guint i = 0; i < array->len; i++){
+        Device *device = binc_adapter_get_device_by_path (g_ptr_array_index(array, i), device_path);
+        if (device != NULL){
+            g_ptr_array_free(array, TRUE);
+            log_debug(TAG,"found %s at %s\n",binc_device_get_name(device),device_path);
+            return (device);
+        }
+    }
 
+    g_ptr_array_free(array, TRUE);
+    return (NULL);
+}
 
