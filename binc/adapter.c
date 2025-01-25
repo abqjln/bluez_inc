@@ -475,16 +475,15 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
 
     Device *device = g_hash_table_lookup(adapter->devices_cache, path);
     if (device == NULL) {
-		// Change occurred in bluez cache, so add to our hash table and continue
+		// Change occurred in bluez cache, so just add to our hash table
         if (g_str_has_prefix(path, adapter->path)) {
             device = binc_device_create(path, adapter);
             g_hash_table_insert(adapter->devices_cache, g_strdup(binc_device_get_path(device)), device);
             binc_internal_device_getall_properties(adapter, device);
         }
     }
-
-//    } else {
-        // Process newly-added or existing device
+    else {
+        // Existing device
         gboolean isDiscoveryResult = FALSE;
         ConnectionState oldState = binc_device_get_connection_state(device);
 
@@ -571,15 +570,7 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
 				}
 			}
 		}
-
-//        if (binc_device_is_central(device)) {
-//            ConnectionState newState = binc_device_get_connection_state(device);
-//            if (oldState != newState) {
-//                if (adapter->centralStateCallback != NULL) {
-//                    adapter->centralStateCallback(adapter, device);
-//                }
-//            }
-//        }
+	}
 
     if (properties_changed != NULL)
         g_variant_iter_free(properties_changed);
