@@ -257,6 +257,9 @@ int binc_agentmanager_register_agent(Agent *agent) {
         case KEYBOARD_DISPLAY:
             capability = "KeyboardDisplay";
             break;
+        default:
+            log_error(TAG, "[%s] Unknown IO capability specified", __func__);
+            return EXIT_FAILURE;
     }
     int result = binc_agentmanager_call_method(agent->connection, "RegisterAgent",
                                                g_variant_new("(os)", agent->path, capability));
