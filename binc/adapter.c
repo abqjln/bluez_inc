@@ -380,9 +380,8 @@ static void binc_internal_device_appeared(__attribute__((unused)) GDBusConnectio
                     // No callback for disconnected device
                 }
                 else {
-                    // Should not occur. If not discovering and not connected how did we get here?
-                    // Set as peripheral and continue
-                    log_error (TAG, "[%s] Error: unknown state", __func__);
+                    // Can occur during pairing/bonding process
+                    log_debug (TAG, "[%s] transition state (pairing/bonding?)", __func__);
                 }
             }
         }
@@ -491,7 +490,7 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
 			// CHANGE TO CONNECTED
 			if (binc_device_get_role (device) == BINC_ROLE_PERIPHERAL) {
 				// Must have been set to BINC_ROLE_PERIPHERAL in binc_device_connect
-				log_debug (TAG, "[%s]: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+				log_debug (TAG, "[%s]: (Connected, peripheral) Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
 						__func__, binc_device_get_name (device) ,binc_device_get_address (device),
 						binc_device_get_connection_state_name (device), newState, oldState,
 						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
@@ -505,7 +504,7 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
 			else if (binc_device_get_role (device) == BINC_ROLE_CENTRAL) {
 				// Could have already been set when device_appeared
 				binc_device_set_role (device, BINC_ROLE_CENTRAL);
-				log_debug (TAG, "[%s]: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+				log_debug (TAG, "[%s]: (Connected, central) Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
 						__func__, binc_device_get_name (device) ,binc_device_get_address (device),
 						binc_device_get_connection_state_name (device), newState, oldState,
 						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
@@ -514,7 +513,7 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
 			else if (binc_device_get_role (device) == BINC_ROLE_UNDEFINED) {
 				// Not previously set; must be a central
 				binc_device_set_role (device, BINC_ROLE_CENTRAL);
-				log_debug (TAG, "[%s]: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+				log_debug (TAG, "[%s]: (Connected, undefined) Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
 						__func__, binc_device_get_name (device) ,binc_device_get_address (device),
 						binc_device_get_connection_state_name (device), newState, oldState,
 						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
@@ -525,7 +524,7 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
 			// CHANGE TO DISCONNECTED
 			if (binc_device_get_role (device) == BINC_ROLE_PERIPHERAL) {
 				binc_device_set_role (device, BINC_ROLE_UNDEFINED);
-				log_debug (TAG, "[%s]: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+				log_debug (TAG, "[%s]: (Disconnected, peripheral) Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
 						__func__, binc_device_get_name (device), binc_device_get_address (device),
 						binc_device_get_connection_state_name (device), newState, oldState,
 						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
@@ -539,15 +538,15 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
 			else if (binc_device_get_role (device) == BINC_ROLE_CENTRAL) {
 				// Could have been set when device_appeared
 				binc_device_set_role (device, BINC_ROLE_UNDEFINED);
-				log_debug (TAG, "[%s]: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+				log_debug (TAG, "[%s]: (Disconnected, central) Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
 						__func__, binc_device_get_name (device), binc_device_get_address (device),
 						binc_device_get_connection_state_name (device), newState, oldState,
 						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
 				binc_adapter_run_remote_central_connection_state_cb (adapter, device);
 			}
 			else if (binc_device_get_role (device) == BINC_ROLE_UNDEFINED) {
-				// Can get here if physical layer interrupted
-				log_error (TAG, "[%s] Error: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+				// Can get here if physical layer interrupted or pairing rejected
+				log_error (TAG, "[%s] (Disconnected, undefined) Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
 						__func__, binc_device_get_name (device), binc_device_get_address (device),
 						binc_device_get_connection_state_name (device), newState, oldState,
 						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
@@ -1282,7 +1281,7 @@ void binc_adapter_run_remote_central_connection_state_cb (Adapter *adapter, Devi
 	if (adapter->centralStateCallback != NULL) {
 		adapter->centralStateCallback (adapter, device);
 	} else {
-        log_error (TAG, "[%s] Error: no cb set\n", __func__);
+        log_debug (TAG, "[%s] No cb set\n", __func__);
     }
 }
 
