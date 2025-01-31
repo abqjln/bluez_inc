@@ -39,6 +39,7 @@ struct binc_agent {
     guint registration_id;
     AgentRequestAuthorizationCallback request_authorization_callback;
     AgentRequestPasskeyCallback request_passkey_callback;
+    AgentRequestConfirmationCallback request_confirmation_callback; // DISPLAY_YES_NO
 };
 
 void binc_agent_free(Agent *agent) {
@@ -109,9 +110,24 @@ static void bluez_agent_method_call(GDBusConnection *conn,
         g_dbus_method_invocation_return_value(invocation, NULL);
     } else if (g_str_equal(method, "RequestConfirmation")) {
         g_variant_get(params, "(ou)", &object_path, &pass);
+        Device *device = binc_agent_get_device_by_path(conn, object_path);
         g_free(object_path);
-        log_debug(TAG, "request confirmation for %u", pass);
-        g_dbus_method_invocation_return_value(invocation, NULL);
+
+		if (device != NULL) {
+			binc_device_set_bonding_state(device, BINC_BONDING);
+		}
+
+		if (agent->request_confirmation_callback != NULL) {
+			if (agent->request_confirmation_callback(device,pass) == TRUE) {
+				g_dbus_method_invocation_return_value(invocation, NULL);
+			} else {
+				g_dbus_method_invocation_return_dbus_error(invocation, "org.bluez.Error.Rejected", "No passkey to confirm");
+			}
+		}
+		else {
+			log_debug(TAG, "NULL request_confirmation callback--confirming passkey %u", pass);
+			g_dbus_method_invocation_return_value(invocation, NULL);
+		}
     } else if (g_str_equal(method, "RequestAuthorization")) {
         g_variant_get(params, "(o)", &object_path);
         log_debug(TAG, "request for authorization %s", object_path);
@@ -294,6 +310,12 @@ void binc_agent_set_request_passkey_cb(Agent *agent, AgentRequestPasskeyCallback
     g_assert(agent != NULL);
     g_assert(callback != NULL);
     agent->request_passkey_callback = callback;
+}
+
+void binc_agent_set_request_confirmation_cb(Agent *agent, AgentRequestConfirmationCallback callback) {
+    g_assert(agent != NULL);
+    g_assert(callback != NULL);
+    agent->request_confirmation_callback = callback;
 }
 
 const char *binc_agent_get_path(const Agent *agent) {

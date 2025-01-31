@@ -35,6 +35,8 @@ typedef gboolean (*AgentRequestAuthorizationCallback)(Device *device);
 
 typedef guint32 (*AgentRequestPasskeyCallback)(Device *device);
 
+typedef gboolean (*AgentRequestConfirmationCallback)(Device *device, guint32 pass);
+
 typedef enum {
     DISPLAY_ONLY, DISPLAY_YES_NO, KEYBOARD_ONLY, NO_INPUT_NO_OUTPUT, KEYBOARD_DISPLAY
 } IoCapability;
@@ -46,6 +48,8 @@ Agent *binc_agent_create(GDBusConnection *dbconnection, const char *path, IoCapa
 void binc_agent_set_request_authorization_cb(Agent *agent, AgentRequestAuthorizationCallback callback);
 
 void binc_agent_set_request_passkey_cb(Agent *agent, AgentRequestPasskeyCallback callback);
+
+void binc_agent_set_request_confirmation_cb(Agent *agent, AgentRequestConfirmationCallback callback);
 
 void binc_agent_free(Agent *agent);
 
