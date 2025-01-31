@@ -94,6 +94,8 @@ void binc_device_set_write_desc_cb(Device *device, OnDescWriteCallback callback)
 
 void binc_device_set_connection_state_change_cb(Device *device, ConnectionStateChangedCallback callback);
 
+void binc_device_set_conn_state_run_cb(Device *device, ConnectionState state, GError *error);
+
 void binc_device_set_services_resolved_cb(Device *device, ServicesResolvedCallback callback);
 
 void binc_device_set_bonding_state_changed_cb(Device *device, BondingStateChangedCallback callback);

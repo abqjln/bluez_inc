@@ -322,6 +322,11 @@ static void binc_device_internal_set_conn_state(Device *device, ConnectionState 
     }
 }
 
+// Need this in adapter.c
+void binc_device_set_conn_state_run_cb(Device *device, ConnectionState state, GError *error) {
+	binc_device_internal_set_conn_state (device, state, error);
+}
+
 static void binc_internal_extract_service(Device *device, const char *object_path, GVariant *properties) {
     g_assert(device != NULL);
     g_assert(object_path != NULL);
@@ -752,6 +757,8 @@ void binc_device_disconnect(Device *device) {
 
     // Don't do anything if we are not connected
     if (device->connection_state != BINC_CONNECTED) return;
+
+	// Don't change role here, let binc_internal_device_changed do it
 
     log_debug(TAG, "Disconnecting '%s' (%s)", device->name, device->address);
 
