@@ -486,65 +486,100 @@ static void binc_internal_device_changed(__attribute__((unused)) GDBusConnection
         ConnectionState newState = binc_device_get_connection_state(device);
         RoleState oldRole = binc_device_get_role (device);
 
+		GError *error = NULL;
 		if (((newState == BINC_CONNECTED)) && (newState != oldState)) {
+			// CHANGE TO CONNECTED
 			if (binc_device_get_role (device) == BINC_ROLE_PERIPHERAL) {
 				// Must have been set to BINC_ROLE_PERIPHERAL in binc_device_connect
-//				if (device->connection_state_callback != NULL) {
-//					device->connection_state_callback (adapter, device, error);
-//				}
+				log_debug (TAG, "[%s]: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+						__func__, binc_device_get_name (device) ,binc_device_get_address (device),
+						binc_device_get_connection_state_name (device), newState, oldState,
+						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
+				binc_device_set_conn_state_run_cb (device, newState, error);
+				if (error != NULL ) {
+						log_error (TAG, "[%s] Error %s in %s callback for %s '%s'[%s]", __func__, error,
+						binc_device_get_connection_state_name (device), binc_device_get_role_name (device),
+						binc_device_get_name (device), binc_device_get_address (device));
+				}
 			}
 			else if (binc_device_get_role (device) == BINC_ROLE_CENTRAL) {
-				// Could have been set when device_appeared
+				// Could have already been set when device_appeared
 				binc_device_set_role (device, BINC_ROLE_CENTRAL);
-				if (adapter->centralStateCallback != NULL) {
-					adapter->centralStateCallback (adapter, device);
-				}
+				log_debug (TAG, "[%s]: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+						__func__, binc_device_get_name (device) ,binc_device_get_address (device),
+						binc_device_get_connection_state_name (device), newState, oldState,
+						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
+				binc_adapter_run_remote_central_connection_state_cb (adapter, device);
 			}
 			else if (binc_device_get_role (device) == BINC_ROLE_UNDEFINED) {
 				// Not previously set; must be a central
 				binc_device_set_role (device, BINC_ROLE_CENTRAL);
-				if (adapter->centralStateCallback != NULL) {
-					adapter->centralStateCallback (adapter, device);
-				}
+				log_debug (TAG, "[%s]: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+						__func__, binc_device_get_name (device) ,binc_device_get_address (device),
+						binc_device_get_connection_state_name (device), newState, oldState,
+						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
+				binc_adapter_run_remote_central_connection_state_cb (adapter, device);
 			}
-
-			log_debug (TAG, "[%s]: Device [%s]:'%s' state changed to %s (%d, old=%d), Role %s (%d, old=%d), isDiscoveryResult=%d",
-					__func__, binc_device_get_address (device), binc_device_get_name (device),
-					binc_device_get_connection_state_name (device), newState, oldState,
-					binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
 		}
 		else if (((newState == BINC_DISCONNECTED)) && (newState != oldState)) {
+			// CHANGE TO DISCONNECTED
 			if (binc_device_get_role (device) == BINC_ROLE_PERIPHERAL) {
 				binc_device_set_role (device, BINC_ROLE_UNDEFINED);
-//				if (device->connection_state_callback != NULL) {
-//					device->connection_state_callback (adapter, device, error);
-//				}
+				log_debug (TAG, "[%s]: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+						__func__, binc_device_get_name (device), binc_device_get_address (device),
+						binc_device_get_connection_state_name (device), newState, oldState,
+						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
+				binc_device_set_conn_state_run_cb (device, newState, error);
+				if (error != NULL ) {
+						log_error (TAG, "[%s] Error %s in %s callback for %s '%s'[%s]", __func__, error,
+						binc_device_get_connection_state_name (device), binc_device_get_role_name (device),
+						binc_device_get_name (device), binc_device_get_address (device));
+				}
 			}
 			else if (binc_device_get_role (device) == BINC_ROLE_CENTRAL) {
 				// Could have been set when device_appeared
 				binc_device_set_role (device, BINC_ROLE_UNDEFINED);
-				if (adapter->centralStateCallback != NULL) {
-					adapter->centralStateCallback (adapter, device);
-				}
+				log_debug (TAG, "[%s]: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+						__func__, binc_device_get_name (device), binc_device_get_address (device),
+						binc_device_get_connection_state_name (device), newState, oldState,
+						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
+				binc_adapter_run_remote_central_connection_state_cb (adapter, device);
 			}
 			else if (binc_device_get_role (device) == BINC_ROLE_UNDEFINED) {
-				// How did we get here?
-				log_error (TAG, "[%s] Error: undefined disconnect", __func__);
+				// Can get here if physical layer interrupted
+				log_error (TAG, "[%s] Error: Device '%s'[%s] state changed to %s (%d, old=%d), (%s) (%d, old=%d), isDiscoveryResult=%d",
+						__func__, binc_device_get_name (device), binc_device_get_address (device),
+						binc_device_get_connection_state_name (device), newState, oldState,
+						binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
 			}
-
-			log_debug (TAG, "[%s]: Device [%s]:'%s' state changed to %s (%d, old=%d), Role %s (%d, old=%d), isDiscoveryResult=%d\n",
-					__func__, binc_device_get_address (device), binc_device_get_name (device),
-					binc_device_get_connection_state_name (device), newState, oldState,
-					binc_device_get_role_name (device), binc_device_get_role(device), oldRole, isDiscoveryResult);
 		}
-
 		else {
+			// NO CONNECTION CHANGE
 			if (isDiscoveryResult && (adapter->discovery_state == BINC_DISCOVERY_STARTED)) {
-				// No connection state change, discovering
 				if (isDiscoveryResult) {
-					// Could be a desired peripheral
-					deliver_discovery_result(adapter, device);
+					if (binc_device_get_connection_state (device) == BINC_DISCONNECTED) {
+						// Send to discovery if disconnected
+						//log_debug (TAG, "[%s]: Sending '%s'[%s] in state %s (%d) isDiscoveryResult=%d to deliver_discovery result", __func__,
+						//		binc_device_get_name (device), binc_device_get_address (device),
+						//		binc_device_get_connection_state_name (device), binc_device_get_connection_state (device), isDiscoveryResult);
+						deliver_discovery_result(adapter, device);
+					} else if (binc_device_get_connection_state (device) == BINC_CONNECTING) {
+						// Still advertising until connected; don't connect twice
+						//log_debug (TAG, "[%s]: Waiting for '%s'[%s] in state %s (%d) isDiscoveryResult=%d to connect", __func__,
+						//		binc_device_get_name (device), binc_device_get_address (device),
+						//		binc_device_get_connection_state_name (device), binc_device_get_connection_state (device), isDiscoveryResult);
+					} else {
+						// If connected or disconnecting, might still be advertising if a multi-role hub
+						//log_debug (TAG, "[%s] '%s'[%s] in state %s (%d) isDiscoveryResult=%d (advertising while connected, perhaps multi-role)", __func__,
+						//		binc_device_get_name (device), binc_device_get_address (device),
+						//		binc_device_get_connection_state_name (device), binc_device_get_connection_state (device), isDiscoveryResult);
+					}
 				}
+			} else {
+				// Might get here before async stop_advertising completes
+				//log_debug (TAG, "[%s] '%s'[%s] in state %s (%d) isDiscoveryResult=%d (waiting for stop_advertising to complete?)", __func__,
+				//		binc_device_get_name (device), binc_device_get_address (device),
+				//		binc_device_get_connection_state_name (device), binc_device_get_connection_state (device), isDiscoveryResult);
 			}
 		}
     }
@@ -1242,3 +1277,14 @@ void *binc_adapter_get_user_data(const Adapter *adapter) {
     g_assert(adapter != NULL);
     return adapter->user_data;
 }
+
+void binc_adapter_run_remote_central_connection_state_cb (Adapter *adapter, Device *device) {
+	if (adapter->centralStateCallback != NULL) {
+		adapter->centralStateCallback (adapter, device);
+	} else {
+        log_error (TAG, "[%s] Error: no cb set\n", __func__);
+    }
+}
+
+
+
