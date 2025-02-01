@@ -276,8 +276,8 @@ Agent *binc_agent_create(GDBusConnection *dbconnection, const char *path, IoCapa
     agent->path = g_strdup(path);
     agent->connection = dbconnection;
     agent->io_capability = io_capability;
-    bluez_register_agent(agent);
-    binc_agentmanager_register_agent(agent);
+    if (bluez_register_agent(agent)) return (NULL);
+	if (binc_agentmanager_register_agent(agent)) return (NULL);
     return agent;
 }
 
