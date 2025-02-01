@@ -21,6 +21,8 @@
  *
  */
 
+#include "/mnt/code/gymlink/gl/gl_colors.h"
+
 #include "agent.h"
 #include "adapter.h"
 #include "device.h"
@@ -40,6 +42,7 @@ struct binc_agent {
     AgentRequestAuthorizationCallback request_authorization_callback;
     AgentRequestPasskeyCallback request_passkey_callback;
     AgentRequestConfirmationCallback request_confirmation_callback; // DISPLAY_YES_NO
+    AgentDisplayPasskeyCallback display_passkey_callback;
 };
 
 void binc_agent_free(Agent *agent) {
@@ -104,12 +107,9 @@ static void bluez_agent_method_call(GDBusConnection *conn,
             g_dbus_method_invocation_return_dbus_error(invocation, "org.bluez.Error.Rejected", "No passkey inputted");
         }
     } else if (g_str_equal(method, "DisplayPasskey")) {
+		// entered is always null here?
         g_variant_get(params, "(ouq)", &object_path, &pass, &entered);
-        log_debug(TAG, "passkey: %u, entered: %u", pass, entered);
-        g_free(object_path);
-        g_dbus_method_invocation_return_value(invocation, NULL);
-    } else if (g_str_equal(method, "RequestConfirmation")) {
-        g_variant_get(params, "(ou)", &object_path, &pass);
+        log_debug(TAG, "Enter passkey %06u on remote (%06u)", pass, entered);
         Device *device = binc_agent_get_device_by_path(conn, object_path);
         g_free(object_path);
 
@@ -117,17 +117,60 @@ static void bluez_agent_method_call(GDBusConnection *conn,
 			binc_device_set_bonding_state(device, BINC_BONDING);
 		}
 
+		if (agent->display_passkey_callback != NULL) {
+			agent->display_passkey_callback(device,pass);
+			g_dbus_method_invocation_return_value(invocation, NULL);
+		}
+		else {
+			log_debug(TAG, "NULL display_passkey callback (%06u)", pass);
+			g_dbus_method_invocation_return_value(invocation, NULL);
+		}
+    } else if (g_str_equal(method, "RequestConfirmation")) {
+        g_variant_get(params, "(ou)", &object_path, &pass);
+        Device *device = binc_agent_get_device_by_path(conn, object_path);
+
+
+log_debug(TAG,"[%s] Request confirmation '%s'[%s] '%s'",__func__,binc_device_get_name(device),binc_device_get_address(device), object_path);
+
+
+
+        g_free(object_path);
+
+		if (device != NULL) {
+
+			//test
+			//void gl_agent_changed_bonding_state_cb (Device *device, BondingState new_state, BondingState old_state, const GError *error); // prototype
+
+			//binc_device_set_bonding_state_changed_cb(device,&gl_agent_changed_bonding_state_cb);
+
+			// leave bonding state as-is
+			binc_device_set_bonding_state(device, BINC_BONDING);
+		}
+
+	if (binc_device_get_bonding_state (device) != BINC_BONDED) {
 		if (agent->request_confirmation_callback != NULL) {
-			if (agent->request_confirmation_callback(device,pass) == TRUE) {
+			agent->request_confirmation_callback (device,pass);
+			// If successful, cb will set BONDED, otherwise NONE
+			if (binc_device_get_bonding_state (device) == BINC_BONDED) {
 				g_dbus_method_invocation_return_value(invocation, NULL);
 			} else {
-				g_dbus_method_invocation_return_dbus_error(invocation, "org.bluez.Error.Rejected", "No passkey to confirm");
+				binc_device_set_bonding_state (device, BINC_BOND_NONE);
+				g_dbus_method_invocation_return_dbus_error(invocation, "org.bluez.Error.Rejected", "Request confirmation failed");
 			}
 		}
 		else {
-			log_debug(TAG, "NULL request_confirmation callback--confirming passkey %u", pass);
+			log_debug(TAG, "NULL request_confirmation callback--confirming passkey %06u", pass);
 			g_dbus_method_invocation_return_value(invocation, NULL);
 		}
+	}
+	else 				g_dbus_method_invocation_return_value(invocation, NULL);
+
+
+// Force reconnect when changes?
+//	binc_device_disconnect (device);
+
+
+
     } else if (g_str_equal(method, "RequestAuthorization")) {
         g_variant_get(params, "(o)", &object_path);
         log_debug(TAG, "request for authorization %s", object_path);
@@ -318,19 +361,27 @@ void binc_agent_set_request_confirmation_cb(Agent *agent, AgentRequestConfirmati
     agent->request_confirmation_callback = callback;
 }
 
+void binc_agent_set_display_passkey_cb(Agent *agent, AgentDisplayPasskeyCallback callback) {
+    g_assert(agent != NULL);
+    g_assert(callback != NULL);
+    agent->display_passkey_callback = callback;
+}
+
 const char *binc_agent_get_path(const Agent *agent) {
     g_assert(agent != NULL);
     return agent->path;
 }
 
 Device *binc_agent_get_device_by_path(GDBusConnection *dbconnection, const char *device_path) {
-    log_debug (TAG, "[%s]\n", __func__);
+    LogLevel tmp = log_get_level();
+    log_set_level(LOG_ERROR);
     GPtrArray *array = binc_adapter_find_all( dbconnection );
+    log_set_level(tmp);
     for (guint i = 0; i < array->len; i++){
         Device *device = binc_adapter_get_device_by_path (g_ptr_array_index(array, i), device_path);
         if (device != NULL){
             g_ptr_array_free(array, TRUE);
-            log_debug(TAG,"found %s at %s\n",binc_device_get_name(device),device_path);
+            log_debug(TAG,CGRN"[%s]: Found '%s'[%s] at %s"CNRM,__func__,binc_device_get_name(device),binc_device_get_address(device),device_path);
             return (device);
         }
     }

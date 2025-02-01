@@ -35,6 +35,8 @@ typedef gboolean (*AgentRequestAuthorizationCallback)(Device *device);
 
 typedef guint32 (*AgentRequestPasskeyCallback)(Device *device);
 
+typedef void (*AgentDisplayPasskeyCallback)(Device *device, guint32 pass);
+
 typedef gboolean (*AgentRequestConfirmationCallback)(Device *device, guint32 pass);
 
 typedef enum {
@@ -48,6 +50,8 @@ Agent *binc_agent_create(GDBusConnection *dbconnection, const char *path, IoCapa
 void binc_agent_set_request_authorization_cb(Agent *agent, AgentRequestAuthorizationCallback callback);
 
 void binc_agent_set_request_passkey_cb(Agent *agent, AgentRequestPasskeyCallback callback);
+
+void binc_agent_set_display_passkey_cb(Agent *agent, AgentDisplayPasskeyCallback callback);
 
 void binc_agent_set_request_confirmation_cb(Agent *agent, AgentRequestConfirmationCallback callback);
 

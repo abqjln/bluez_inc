@@ -21,6 +21,8 @@
  *
  */
 
+#include "/mnt/code/gymlink/gl/gl_colors.h"
+
 #include <gio/gio.h>
 #include "logger.h"
 #include "device.h"
@@ -160,7 +162,7 @@ static void binc_device_free_service_data(Device *device) {
 void binc_device_free(Device *device) {
     g_assert(device != NULL);
 
-    log_debug(TAG, "freeing %s", device->path);
+    //log_debug(TAG, "freeing %s", device->path);
 
     if (device->device_prop_changed != 0) {
         g_dbus_connection_signal_unsubscribe(device->connection, device->device_prop_changed);
@@ -544,6 +546,9 @@ void binc_device_set_bonding_state_changed_cb(Device *device, BondingStateChange
     g_assert(device != NULL);
     g_assert(callback != NULL);
 
+	log_debug(TAG, CBLU"[%s] Setting bonding state callback for '%s':[%s] and %s (%p)"CNRM, __func__,
+			binc_device_get_name (device), binc_device_get_address (device), binc_adapter_get_name (binc_device_get_adapter (device)), callback);
+
     device->bonding_state_callback = callback;
 }
 
@@ -554,9 +559,21 @@ void binc_device_set_bonding_state(Device *device, BondingState bonding_state) {
     device->bondingState = bonding_state;
     if (device->bonding_state_callback != NULL) {
         if (device->bondingState != old_state) {
+
+			log_debug(TAG, CBLU"[%s] Calling bonding state callback for '%s':[%s] and %s (%p)"CNRM, __func__,
+					binc_device_get_name (device), binc_device_get_address (device), binc_adapter_get_name (binc_device_get_adapter (device)), device->bonding_state_callback);
+
             device->bonding_state_callback(device, device->bondingState, old_state, NULL);
         }
     }
+	else {
+
+if(g_strcmp0(binc_device_get_name(device),NULL))
+	if (g_str_has_prefix (binc_device_get_name(device),"CP"))
+			log_debug(TAG, CRED"[%s] NULL bonding state callback for '%s':[%s] and %s (%p)"CNRM, __func__,
+					binc_device_get_name (device), binc_device_get_address (device), binc_adapter_get_name (binc_device_get_adapter (device)), device->bonding_state_callback);
+
+	}
 }
 
 static void binc_device_changed(__attribute__((unused)) GDBusConnection *conn,
